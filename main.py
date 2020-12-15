@@ -26,18 +26,9 @@ class Board:
             pass
 
     def render(self):
-        for x, i in zip(range(self.width), range(self.left, self.left + self.width * self.cell_size,
-                                                 self.cell_size)):
-            for y, j in zip(range(self.height), range(self.top, self.top + self.height * self.cell_size,
-                                                      self.cell_size)):
+        for i in range(self.left, self.left + self.width * self.cell_size, self.cell_size):
+            for j in range(self.top, self.top + self.height * self.cell_size, self.cell_size):
                 pygame.draw.rect(screen, pygame.Color('white'), [i, j, self.cell_size, self.cell_size], 1)
-                if self.board[x][y] == 10:
-                    pygame.draw.rect(screen, pygame.Color('red'),
-                                     (i + 1, j + 1, self.cell_size - 2, self.cell_size - 2))
-                elif self.board[x][y] != -1:
-                    font = pygame.font.Font(None, self.cell_size)
-                    text = font.render(str(self.board[x][y]), True, (0, 255, 0))
-                    screen.blit(text, (i, j))
 
     def set_view(self, left, top, cell_size):
         self.left = left
@@ -48,6 +39,16 @@ class Board:
 class Minesweeper(Board):
     def __init__(self, width, height):
         super().__init__(width, height)
+        self.COLORS = [
+            pygame.Color('blue'),
+            pygame.Color('green'),
+            pygame.Color('red'),
+            pygame.Color('purple'),
+            pygame.Color('maroon'),
+            pygame.Color('turquoise'),
+            pygame.Color('black'),
+            pygame.Color('gray')
+        ]
         count = 0
         while count < 10:
             x, y = randint(0, width - 1), randint(0, height - 1)
@@ -99,15 +100,30 @@ class Minesweeper(Board):
                 if x + 1 < len(self.board) and y + 1 < len(self.board[x]) and self.board[x + 1][y + 1] == -1:
                     self.open_cell((x + 1, y + 1))
 
+    def render(self):
+        for i, width in zip(range(self.width), range(self.left, self.left + self.width * self.cell_size,
+                                                     self.cell_size)):
+            for j, height in zip(range(self.height), range(self.top, self.top + self.height * self.cell_size,
+                                                           self.cell_size)):
+                pygame.draw.rect(screen, pygame.Color('white'), [width, height, self.cell_size, self.cell_size], 1)
+                if self.board[i][j] != -1 and self.board[i][j] != 10:
+                    pygame.draw.rect(screen, pygame.Color('gray50'),
+                                     (width + 1, height + 1, self.cell_size - 2, self.cell_size - 2))
+                    if self.board[i][j] != 0:
+                        font = pygame.font.Font(None, self.cell_size)
+                        text = font.render(str(self.board[i][j]), True, self.COLORS[self.board[i][j] - 1])
+                        screen.blit(text, (width + self.cell_size / 5, height + self.cell_size / 5))
+
 
 if __name__ == '__main__':
     pygame.init()
-    size = 340, 500
+    size = 300, 300
     screen = pygame.display.set_mode(size)
-    pygame.display.set_caption('Дедушка сапера')
+    pygame.display.set_caption('Сапер')
     running = True
 
-    board = Minesweeper(10, 15)
+    board = Minesweeper(10, 10)
+    board.set_view(0, 0, 30)
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
