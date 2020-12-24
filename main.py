@@ -12,11 +12,17 @@ class Cell:
     def get_neighbors(self):
         return self.neighbors
 
+    def is_flag(self):
+        return self.flag
+
     def is_mine(self):
         return self.mine
 
     def is_opened(self):
         return self.opened
+
+    def set_flag(self):
+        self.flag = not self.flag
     
     def set_mine(self):
         self.mine = True
@@ -54,6 +60,11 @@ class Minesweeper:
                 self.board[x][y].set_mine()
                 count += 1
 
+    def flag(self, cell):
+        x, y = cell
+        if not self.board[x][y].is_opened():
+            self.board[x][y].set_flag()
+
     def get_cell(self, mouse_pos):
         for n1, i in zip(range(self.width), range(self.left, self.left + self.width * self.cell_size,
                                                   self.cell_size)):
@@ -63,14 +74,17 @@ class Minesweeper:
                     return n1, n2
         return None
 
-    def get_click(self, mouse_pos):
+    def get_click(self, mouse_pos, button):
         cell = self.get_cell(mouse_pos)
         if cell:
-            self.open_cell(cell)
+            if button == 1:
+                self.open_cell(cell)
+            elif button == 3:
+                self.flag(cell)
 
     def open_cell(self, cell):
         x, y = cell
-        if not self.board[x][y].is_opened():
+        if not self.board[x][y].is_opened() and not self.board[x][y].is_flag():
             count = 0
             if x - 1 > -1 and self.board[x - 1][y].is_mine():
                 count += 1
@@ -109,12 +123,15 @@ class Minesweeper:
                     self.open_cell((x + 1, y + 1))
 
     def render(self):
+        all_sprites = pygame.sprite.Group()
         for i, width in zip(range(self.width), range(self.left, self.left + self.width * self.cell_size,
                                                      self.cell_size)):
             for j, height in zip(range(self.height), range(self.top, self.top + self.height * self.cell_size,
                                                            self.cell_size)):
                 pygame.draw.rect(screen, pygame.Color('white'), [width, height, self.cell_size, self.cell_size], 1)
-                if self.board[i][j].is_opened():
+                if self.board[i][j].is_opened() and self.board[i][j].is_mine():
+                    pass
+                elif self.board[i][j].is_opened():
                     pygame.draw.rect(screen, pygame.Color('gray50'),
                                      (width + 1, height + 1, self.cell_size - 2, self.cell_size - 2))
                     if self.board[i][j].get_neighbors() > 0:
@@ -122,6 +139,13 @@ class Minesweeper:
                         text = font.render(str(self.board[i][j].get_neighbors()), True,
                                            self.COLORS[self.board[i][j].get_neighbors() - 1])
                         screen.blit(text, (width + self.cell_size / 5, height + self.cell_size / 5))
+                elif self.board[i][j].is_flag():
+                    sprite = pygame.sprite.Sprite(all_sprites)
+                    sprite.image = pygame.image.load('data/flag.png')
+                    sprite.rect = sprite.image.get_rect()
+                    sprite.rect.x = width
+                    sprite.rect.y = height
+            all_sprites.draw(screen)
 
 
 if __name__ == '__main__':
@@ -137,7 +161,7 @@ if __name__ == '__main__':
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.MOUSEBUTTONUP:
-                board.get_click(event.pos)
+                board.get_click(event.pos, event.button)
         screen.fill((0, 0, 0))
         board.render()
         pygame.display.flip()
