@@ -57,7 +57,7 @@ class Minesweeper:
             pygame.Color('gray')
         ]
         count = 0
-        while count < 10:
+        while count < 40:
             x, y = randint(0, width - 1), randint(0, height - 1)
             if not self[x, y].is_mine():
                 self[x, y].set_mine()
@@ -132,8 +132,7 @@ class Minesweeper:
                         self.open_cell((x - 1, y + 1))
                     if x + 1 < len(self.board) and y - 1 > -1 and not self[x + 1, y - 1].is_mine():
                         self.open_cell((x + 1, y - 1))
-                    if x + 1 < len(self.board) and y + 1 < len(self.board[x]) and \
-                            not self[x + 1, y + 1].is_mine():
+                    if x + 1 < len(self.board) and y + 1 < len(self.board[x]) and not self[x + 1, y + 1].is_mine():
                         self.open_cell((x + 1, y + 1))
                 if all(map(lambda row: all(row), self.board)):
                     state['in_game'] = False
@@ -141,8 +140,42 @@ class Minesweeper:
 
     def open_neighbors(self, cell):
         x, y = cell
-        if self[x, y]:
-            pass
+        if self[x, y].is_opened():
+            count = 0
+            if x - 1 > -1 and self[x - 1, y].is_flag():
+                count += 1
+            if y - 1 > -1 and self[x, y - 1].is_flag():
+                count += 1
+            if x + 1 < len(self.board) and self[x + 1, y].is_flag():
+                count += 1
+            if y + 1 < len(self.board[x]) and self[x, y + 1].is_flag():
+                count += 1
+            if x - 1 > -1 and y - 1 > -1 and self[x - 1, y - 1].is_flag():
+                count += 1
+            if x - 1 > -1 and y + 1 < len(self.board[x]) and self[x - 1, y + 1].is_flag():
+                count += 1
+            if x + 1 < len(self.board) and y - 1 > -1 and self[x + 1, y - 1].is_flag():
+                count += 1
+            if x + 1 < len(self.board) and y + 1 < len(self.board[x]) and self[x + 1, y + 1].is_flag():
+                count += 1
+
+            if count == self[x, y].get_neighbors():
+                if x - 1 > -1:
+                    self.open_cell((x - 1, y))
+                if y - 1 > -1:
+                    self.open_cell((x, y - 1))
+                if x + 1 < len(self.board):
+                    self.open_cell((x + 1, y))
+                if y + 1 < len(self.board[x]):
+                    self.open_cell((x, y + 1))
+                if x - 1 > -1 and y - 1 > -1:
+                    self.open_cell((x - 1, y - 1))
+                if x - 1 > -1 and y + 1 < len(self.board[x]):
+                    self.open_cell((x - 1, y + 1))
+                if x + 1 < len(self.board) and y - 1 > -1:
+                    self.open_cell((x + 1, y - 1))
+                if x + 1 < len(self.board) and y + 1 < len(self.board[x]):
+                    self.open_cell((x + 1, y + 1))
 
     def render(self):
         all_sprites = pygame.sprite.Group()
@@ -151,7 +184,19 @@ class Minesweeper:
             for j, height in zip(range(self.height), range(self.top, self.top + self.height * self.cell_size,
                                                            self.cell_size)):
                 pygame.draw.rect(screen, pygame.Color('white'), [width, height, self.cell_size, self.cell_size], 1)
-                if self[i, j].is_opened() and self[i, j].is_mine():
+                if self[i, j].is_flag() and not self[i, j].is_mine() and not state['in_game']:
+                    sprite = pygame.sprite.Sprite(all_sprites)
+                    sprite.image = pygame.image.load('data/no_flag.png')
+                    sprite.rect = sprite.image.get_rect()
+                    sprite.rect.x = width
+                    sprite.rect.y = height
+                elif self[i, j].is_flag():
+                    sprite = pygame.sprite.Sprite(all_sprites)
+                    sprite.image = pygame.image.load('data/flag.png')
+                    sprite.rect = sprite.image.get_rect()
+                    sprite.rect.x = width
+                    sprite.rect.y = height
+                elif self[i, j].is_opened() and self[i, j].is_mine():
                     sprite = pygame.sprite.Sprite(all_sprites)
                     sprite.image = pygame.image.load('data/boom.png')
                     sprite.rect = sprite.image.get_rect()
@@ -171,29 +216,37 @@ class Minesweeper:
                         text = font.render(str(self[i, j].get_neighbors()), True,
                                            self.COLORS[self[i, j].get_neighbors() - 1])
                         screen.blit(text, (width + self.cell_size / 5, height + self.cell_size / 5))
-                elif self[i, j].is_flag() and not self[i, j].is_mine() and not state['in_game']:
-                    sprite = pygame.sprite.Sprite(all_sprites)
-                    sprite.image = pygame.image.load('data/no_flag.png')
-                    sprite.rect = sprite.image.get_rect()
-                    sprite.rect.x = width
-                    sprite.rect.y = height
-                elif self[i, j].is_flag():
-                    sprite = pygame.sprite.Sprite(all_sprites)
-                    sprite.image = pygame.image.load('data/flag.png')
-                    sprite.rect = sprite.image.get_rect()
-                    sprite.rect.x = width
-                    sprite.rect.y = height
             all_sprites.draw(screen)
+            if not state['in_game']:
+                if state['win']:
+                    color = pygame.Color('green')
+                    text = ['Вы выиграли!', f'Время: {round(timer, 2)}']
+                else:
+                    color = pygame.Color('red')
+                    text = ['Вы проиграли']
+                text.append('Нажмите R для начала новой игры')
+                font = pygame.font.Font(None, 25)
+                text_coord = 10 + cells_y * 30 + 10
+                for line in text:
+                    string_rendered = font.render(line, True, color)
+                    result_screen = string_rendered.get_rect()
+                    text_coord += 10
+                    result_screen.top = text_coord
+                    result_screen.x = 10
+                    text_coord += result_screen.height
+                    screen.blit(string_rendered, result_screen)
 
 
 if __name__ == '__main__':
     pygame.init()
-    cells_x = 10
-    cells_y = 10
-    size = 10 + cells_x * 30 + 10, 10 + cells_y * 30 + 10
+    cells_x = 18
+    cells_y = 14
+    size = 10 + cells_x * 30 + 10, 10 + cells_y * 30 + 100
     screen = pygame.display.set_mode(size)
     pygame.display.set_caption('Сапер')
+    clock = pygame.time.Clock()
     running = True
+    timer = 0
 
     board = Minesweeper(cells_x, cells_y)
     state = {'in_game': True, 'win': False}
@@ -207,6 +260,9 @@ if __name__ == '__main__':
                 if event.key == pygame.K_r:
                     board = Minesweeper(cells_x, cells_y)
                     state = {'in_game': True, 'win': False}
+                    timer = 0
+        if state['in_game']:
+            timer += clock.tick() / 1000
         screen.fill((0, 0, 0))
         board.render()
         pygame.display.flip()
