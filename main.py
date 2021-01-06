@@ -24,12 +24,18 @@ class Cell:
     def is_opened(self):
         return self.opened
 
+    def remove_flag(self):
+        self.flag = False
+
+    def remove_mine(self):
+        self.mine = False
+
     def set_flag(self):
         self.flag = not self.flag
-    
+
     def set_mine(self):
         self.mine = True
-    
+
     def set_neighbors(self, n):
         self.neighbors = n
 
@@ -63,6 +69,9 @@ class Minesweeper:
                 self[x, y].set_mine()
                 count += 1
 
+        self.is_mine_here = False
+        self.first_click = True
+
     def flag(self, cell):
         x, y = cell
         if not self[x, y].is_opened():
@@ -79,7 +88,7 @@ class Minesweeper:
 
     def get_click(self, mouse_pos, button):
         cell = self.get_cell(mouse_pos)
-        if cell and state['in_game']:
+        if cell and state['in_game'] and not pause:
             if button == 1:
                 self.open_cell(cell)
             elif button == 2:
@@ -90,14 +99,31 @@ class Minesweeper:
     def __getitem__(self, item):
         return self.board[item[0]][item[1]]
 
-    def open_cell(self, cell):
-        x, y = cell
-        if not self[x, y].is_opened() and not self[x, y].is_flag():
+    def is_bomb(self, mouse_pos):
+        cell = self.get_cell(mouse_pos)
+        if cell and cheat_mode:
+            x, y = cell
             if self[x, y].is_mine():
+                self.is_mine_here = True
+            else:
+                self.is_mine_here = False
+
+    def open_cell(self, cell, open_flag=False):
+        x, y = cell
+        if not self[x, y].is_opened() and (not self[x, y].is_flag() or open_flag):
+            if self[x, y].is_mine() and not self.first_click:
                 state['in_game'] = False
                 state['win'] = False
                 self[x, y].set_opened()
             else:
+                # сработает, только если этот ход - первый
+                if self[x, y].is_mine():
+                    self[x, y].remove_mine()
+                    while True:
+                        x1, y1 = randint(0, self.width - 1), randint(0, self.height - 1)
+                        if not self[x1, y1].is_mine() and x1 != x and y1 != y:
+                            self[x1, y1].set_mine()
+                            break
                 count = 0
                 if x - 1 > -1 and self[x - 1, y].is_mine():
                     count += 1
@@ -117,26 +143,31 @@ class Minesweeper:
                     count += 1
                 self[x, y].set_neighbors(count)
                 self[x, y].set_opened()
+                self[x, y].remove_flag()
+                self.first_click = False
                 if count == 0:
                     if x - 1 > -1 and not self[x - 1, y].is_mine():
-                        self.open_cell((x - 1, y))
+                        self.open_cell((x - 1, y), True)
                     if y - 1 > -1 and not self[x, y - 1].is_mine():
-                        self.open_cell((x, y - 1))
+                        self.open_cell((x, y - 1), True)
                     if x + 1 < len(self.board) and not self[x + 1, y].is_mine():
-                        self.open_cell((x + 1, y))
+                        self.open_cell((x + 1, y), True)
                     if y + 1 < len(self.board[x]) and not self[x, y + 1].is_mine():
-                        self.open_cell((x, y + 1))
+                        self.open_cell((x, y + 1), True)
                     if x - 1 > -1 and y - 1 > -1 and not self[x - 1, y - 1].is_mine():
-                        self.open_cell((x - 1, y - 1))
+                        self.open_cell((x - 1, y - 1), True)
                     if x - 1 > -1 and y + 1 < len(self.board[x]) and not self[x - 1, y + 1].is_mine():
-                        self.open_cell((x - 1, y + 1))
+                        self.open_cell((x - 1, y + 1), True)
                     if x + 1 < len(self.board) and y - 1 > -1 and not self[x + 1, y - 1].is_mine():
-                        self.open_cell((x + 1, y - 1))
+                        self.open_cell((x + 1, y - 1), True)
                     if x + 1 < len(self.board) and y + 1 < len(self.board[x]) and not self[x + 1, y + 1].is_mine():
-                        self.open_cell((x + 1, y + 1))
+                        self.open_cell((x + 1, y + 1), True)
+
                 if all(map(lambda row: all(row), self.board)):
                     state['in_game'] = False
                     state['win'] = True
+
+                self.first_click = False
 
     def open_neighbors(self, cell):
         x, y = cell
@@ -217,6 +248,19 @@ class Minesweeper:
                                            self.COLORS[self[i, j].get_neighbors() - 1])
                         screen.blit(text, (width + self.cell_size / 5, height + self.cell_size / 5))
             all_sprites.draw(screen)
+
+            if self.is_mine_here:
+                pygame.draw.rect(screen, pygame.Color('green'), (0, 0, 5, 5))
+
+            if pause:
+                font = pygame.font.Font(None, 25)
+                text_coord = 10 + cells_y * 30 + 10
+                string_rendered = font.render('Пауза. Нажмите P, чтобы продолжить игру', True, pygame.Color('white'))
+                pause_screen = string_rendered.get_rect()
+                pause_screen.top = text_coord
+                pause_screen.x = 10
+                screen.blit(string_rendered, pause_screen)
+
             if not state['in_game']:
                 if state['win']:
                     color = pygame.Color('green')
@@ -246,21 +290,32 @@ if __name__ == '__main__':
     pygame.display.set_caption('Сапер')
     clock = pygame.time.Clock()
     running = True
-    timer = 0
 
     board = Minesweeper(cells_x, cells_y)
     state = {'in_game': True, 'win': False}
+    pause = False
+    timer = 0
+    cheat_mode = False
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.MOUSEBUTTONUP:
                 board.get_click(event.pos, event.button)
+            if event.type == pygame.MOUSEMOTION:
+                board.is_bomb(event.pos)
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:
+                if event.key == pygame.K_p:
+                    if state['in_game']:
+                        pause = not pause
+                elif event.key == pygame.K_r:
                     board = Minesweeper(cells_x, cells_y)
                     state = {'in_game': True, 'win': False}
                     timer = 0
+                elif event.key == pygame.K_c and event.mod & pygame.KMOD_LSHIFT:
+                    cheat_mode = True
+
         if state['in_game']:
             timer += clock.tick() / 1000
         screen.fill((0, 0, 0))
