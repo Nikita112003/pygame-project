@@ -1,5 +1,38 @@
+from math import inf
 import pygame
 from random import randint
+import sys
+
+
+def terminate():
+    pygame.quit()
+    sys.exit()
+
+
+def help_screen():
+    intro_text = ['ПОМОЩЬ', '', 'R — новая игра',
+                  'P — пауза', 'M — включение/выключение звука',
+                  'H — помощь']
+
+    font = pygame.font.Font(None, 30)
+    text_coord = 10
+    for line in intro_text:
+        string_rendered = font.render(line, True, pygame.Color('white'))
+        intro_rect = string_rendered.get_rect()
+        text_coord += 10
+        intro_rect.top = text_coord
+        intro_rect.x = 10
+        text_coord += intro_rect.height
+        screen.blit(string_rendered, intro_rect)
+
+    while True:
+        for event_ in pygame.event.get():
+            if event_.type == pygame.QUIT:
+                terminate()
+            elif event_.type == pygame.KEYDOWN or \
+                    event_.type == pygame.MOUSEBUTTONDOWN:
+                return  # начинаем игру
+        pygame.display.flip()
 
 
 class Cell:
@@ -77,6 +110,9 @@ class Minesweeper:
         if not self[x, y].is_opened():
             self[x, y].set_flag()
 
+    def game_starts(self):
+        return not self.first_click
+
     def get_cell(self, mouse_pos):
         for n1, i in zip(range(self.width), range(self.left, self.left + self.width * self.cell_size,
                                                   self.cell_size)):
@@ -109,12 +145,16 @@ class Minesweeper:
                 self.is_mine_here = False
 
     def open_cell(self, cell, open_flag=False):
+        global record
+
         x, y = cell
         if not self[x, y].is_opened() and (not self[x, y].is_flag() or open_flag):
             if self[x, y].is_mine() and not self.first_click:
                 state['in_game'] = False
                 state['win'] = False
                 self[x, y].set_opened()
+                if not mute:
+                    boom_sound.play()
             else:
                 # сработает, только если этот ход - первый
                 if self[x, y].is_mine():
@@ -124,6 +164,7 @@ class Minesweeper:
                         if not self[x1, y1].is_mine() and x1 != x and y1 != y:
                             self[x1, y1].set_mine()
                             break
+
                 count = 0
                 if x - 1 > -1 and self[x - 1, y].is_mine():
                     count += 1
@@ -166,6 +207,10 @@ class Minesweeper:
                 if all(map(lambda row: all(row), self.board)):
                     state['in_game'] = False
                     state['win'] = True
+                    if timer < record:
+                        record = timer
+                    if not mute:
+                        win_sound.play()
 
                 self.first_click = False
 
@@ -265,6 +310,8 @@ class Minesweeper:
                 if state['win']:
                     color = pygame.Color('green')
                     text = ['Вы выиграли!', f'Время: {round(timer, 2)}']
+                    if timer == record:
+                        text[1] += ' (РЕКОРД!)'
                 else:
                     color = pygame.Color('red')
                     text = ['Вы проиграли']
@@ -289,36 +336,57 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode(size)
     pygame.display.set_caption('Сапер')
     clock = pygame.time.Clock()
-    running = True
 
-    board = Minesweeper(cells_x, cells_y)
+    game = Minesweeper(cells_x, cells_y)
     state = {'in_game': True, 'win': False}
     pause = False
     timer = 0
+    record = inf
     cheat_mode = False
 
+    mute = False
+    boom_sound = pygame.mixer.Sound('data/boom.wav')
+    win_sound = pygame.mixer.Sound('data/win.wav')
+
+    running = True
+    help_screen_on = True
+    help_screen()
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                help_screen_on = False
             if event.type == pygame.MOUSEBUTTONUP:
-                board.get_click(event.pos, event.button)
+                if help_screen_on:
+                    help_screen_on = False
+                else:
+                    game.get_click(event.pos, event.button)
             if event.type == pygame.MOUSEMOTION:
-                board.is_bomb(event.pos)
+                game.is_bomb(event.pos)
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_p:
+                if event.key == pygame.K_h:
+                    help_screen_on = True
+                    screen.fill(pygame.Color('black'))
+                    help_screen()
+                elif event.key == pygame.K_m:
+                    mute = not mute
+                elif event.key == pygame.K_p:
                     if state['in_game']:
                         pause = not pause
                 elif event.key == pygame.K_r:
-                    board = Minesweeper(cells_x, cells_y)
+                    game = Minesweeper(cells_x, cells_y)
                     state = {'in_game': True, 'win': False}
+                    pause = False
                     timer = 0
+                elif event.key == pygame.K_ESCAPE:
+                    running = False
                 elif event.key == pygame.K_c and event.mod & pygame.KMOD_LSHIFT:
                     cheat_mode = True
 
-        if state['in_game']:
+        if state['in_game'] and game.game_starts() and not pause:
             timer += clock.tick() / 1000
         screen.fill((0, 0, 0))
-        board.render()
+        game.render()
         pygame.display.flip()
     pygame.quit()
