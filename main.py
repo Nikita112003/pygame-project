@@ -424,6 +424,7 @@ if __name__ == '__main__':
     screen_rect = (0, 0, width, height)
     screen = pygame.display.set_mode(size)
     pygame.display.set_caption('Сапер')
+    pygame.display.set_icon(pygame.image.load('data/boom.png'))
     clock = pygame.time.Clock()
 
     colors = {
