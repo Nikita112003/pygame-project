@@ -115,7 +115,7 @@ class Minesweeper:
         self.height = height_
         self.board = [[Cell() for _ in range(height_)] for _ in range(width_)]
         self.left = 10
-        self.top = 10
+        self.top = 50
         self.cell_size = 30
 
         self.COLORS = [
@@ -135,6 +135,7 @@ class Minesweeper:
                 self[x, y].set_mine()
                 count += 1
 
+        self.flags = mines_
         self.is_mine_here = False
         self.first_click = True
 
@@ -142,6 +143,10 @@ class Minesweeper:
         x, y = cell
         if not self[x, y].is_opened():
             self[x, y].set_flag()
+            if self[x, y].is_flag():
+                self.flags -= 1
+            else:
+                self.flags += 1
 
     def game_starts(self):
         return not self.first_click
@@ -178,7 +183,7 @@ class Minesweeper:
                 self.is_mine_here = False
 
     def open_cell(self, cell, open_flag=False):
-        global record
+        global records
 
         x, y = cell
         if not self[x, y].is_opened() and (not self[x, y].is_flag() or open_flag):
@@ -217,7 +222,12 @@ class Minesweeper:
                     count += 1
                 self[x, y].set_neighbors(count)
                 self[x, y].set_opened()
+                flag_before = self[x, y].is_flag()
                 self[x, y].remove_flag()
+                flag_after = self[x, y].is_flag()
+                if flag_before is True and flag_after is True:
+                    self.flags -= 1
+
                 self.first_click = False
                 if count == 0:
                     if x - 1 > -1 and not self[x - 1, y].is_mine():
@@ -241,8 +251,8 @@ class Minesweeper:
                     state['in_game'] = False
                     state['win'] = True
                     n = 1
-                    if timer < record[level]:
-                        record[level] = timer
+                    if timer < records[level]:
+                        records[level] = timer
                         n = 3
                     for i in range(n):
                         create_particles((random.randint(0, width), random.randint(0, height)))
@@ -331,37 +341,57 @@ class Minesweeper:
                         screen.blit(text, (width_ + self.cell_size / 5, height_ + self.cell_size / 5))
             all_sprites_.draw(screen)
 
+            font = pygame.font.Font(None, 25)
+            text_coord = 10
+            string_rendered = font.render(f'Время: {round(timer)}    Флаги: {self.flags}', True, colors['foreground'])
+            info_text = string_rendered.get_rect()
+            info_text.top = text_coord
+            info_text.x = self.left * 2
+            screen.blit(string_rendered, info_text)
+
             if self.is_mine_here:
                 pygame.draw.rect(screen, pygame.Color('green'), (0, 0, 5, 5))
 
             if pause:
                 font = pygame.font.Font(None, 25)
-                text_coord = 10 + cells_y * 30 + 10
-                string_rendered = font.render('Пауза. Нажмите P, чтобы продолжить игру', True, colors['foreground'])
-                pause_screen = string_rendered.get_rect()
-                pause_screen.top = text_coord
-                pause_screen.x = 10
-                screen.blit(string_rendered, pause_screen)
+                text_coord = self.top + cells_y * 30 + 10
+                text = ['Пауза. Нажмите P,', 'чтобы продолжить игру']
+                for line in text:
+                    string_rendered = font.render(line, True, colors['foreground'])
+                    result_screen = string_rendered.get_rect()
+                    text_coord += 10
+                    result_screen.top = text_coord
+                    result_screen.x = self.left
+                    text_coord += result_screen.height
+                    screen.blit(string_rendered, result_screen)
 
             if not state['in_game']:
                 if state['win']:
-                    color = pygame.Color('green')
+                    if colors['background'] == pygame.Color('black'):
+                        color = pygame.Color('green')
+                    else:
+                        color = pygame.Color('darkgreen')
                     text = ['Вы выиграли!', f'Время: {round(timer, 2)}']
-                    if timer == record[level]:
+                    if timer >= 3600:
+                        text[0] = 'o_o?'
+                    if timer == records[level]:
                         text[1] += ' (РЕКОРД!)'
                 else:
-                    color = pygame.Color('red')
+                    if colors['background'] == pygame.Color('black'):
+                        color = pygame.Color('red')
+                    else:
+                        color = pygame.Color('darkred')
                     text = ['Вы проиграли']
                 text.append('Нажмите R для начала новой игры')
 
                 font = pygame.font.Font(None, 25)
-                text_coord = 10 + cells_y * 30 + 10
+                text_coord = self.top + cells_y * 30 + 10
                 for line in text:
                     string_rendered = font.render(line, True, color)
                     result_screen = string_rendered.get_rect()
                     text_coord += 10
                     result_screen.top = text_coord
-                    result_screen.x = 10
+                    result_screen.x = self.left
                     text_coord += result_screen.height
                     screen.blit(string_rendered, result_screen)
 
@@ -420,7 +450,7 @@ if __name__ == '__main__':
         exit()
 
     pygame.init()
-    size = width, height = 10 + cells_x * 30 + 10, 10 + cells_y * 30 + 100
+    size = width, height = 10 + cells_x * 30 + 10, 50 + cells_y * 30 + 100
     screen_rect = (0, 0, width, height)
     screen = pygame.display.set_mode(size)
     pygame.display.set_caption('Сапер')
@@ -436,11 +466,12 @@ if __name__ == '__main__':
     state = {'in_game': True, 'win': False}
     pause = False
     timer = 0
-    record = {
+    records = {
         EASY: inf,
         MEDIUM: inf,
         HARD: inf
     }
+
     cheat_mode = False
 
     all_sprites = pygame.sprite.Group()
@@ -470,7 +501,7 @@ if __name__ == '__main__':
                 game.is_bomb(event.pos)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_c and event.mod & pygame.KMOD_LSHIFT:
-                    cheat_mode = True
+                    cheat_mode = not cheat_mode
                 elif event.key == pygame.K_c:
                     colors['background'], colors['foreground'] = colors['foreground'], colors['background']
                 elif event.key == pygame.K_h:
@@ -480,7 +511,7 @@ if __name__ == '__main__':
                     widget = LevelChoose()
                     widget.show()
                     app.exec()
-                    size = 10 + cells_x * 30 + 10, 10 + cells_y * 30 + 100
+                    size = width, height = 10 + cells_x * 30 + 10, 50 + cells_y * 30 + 100
                     if cells_x == 0:
                         pass
                     else:
@@ -501,6 +532,8 @@ if __name__ == '__main__':
 
         if state['in_game'] and game.game_starts() and not pause:
             timer += clock.tick() / 1000
+        else:
+            timer += clock.tick() * 0
 
         screen.fill(colors['background'])
         game.render()
